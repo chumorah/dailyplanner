@@ -2097,16 +2097,7 @@ function renderSettings() {
         <div class="gcal-status gcal-connected">✅ Connected to Google Calendar</div>
         <div style="margin:12px 0 8px;font-size:12px;font-weight:600;color:var(--tmuted)">SHOW IN PLANNER</div>
         <div id="gcal-cal-list" style="margin-bottom:12px;">
-          ${(gcal.calendarList||[]).length === 0
-            ? `<div style="font-size:12px;color:var(--tdim)">Loading calendars… <button class="btn btn-outline" id="gcal-refresh-cals" style="padding:2px 8px;font-size:11px;margin-left:6px;">Refresh</button></div>`
-            : (gcal.calendarList||[]).map(cal => `
-              <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px;">
-                <input type="checkbox" data-calid="${cal.id}"
-                  ${(gcal.selectedCalendars||[cal.id]).includes(cal.id) ? 'checked' : ''}>
-                <span style="width:10px;height:10px;border-radius:50%;background:${cal.backgroundColor||'#4285f4'};flex-shrink:0;"></span>
-                ${esc(cal.summary)}
-              </label>`).join('')
-          }
+          <div style="font-size:12px;color:var(--tdim)">Loading calendars…</div>
         </div>
         <button class="btn btn-danger" id="gcal-disconnect">Disconnect</button>
       ` : `<div class="gcal-status gcal-disconnected">⚠️ Not connected</div>`}
@@ -2177,27 +2168,8 @@ function renderSettings() {
   document.getElementById('gcal-connect')?.addEventListener('click', gcalConnect);
   document.getElementById('gcal-disconnect')?.addEventListener('click', gcalDisconnect);
 
-  // Calendar checkboxes — update selected list and refresh planner
-  document.querySelectorAll('#gcal-cal-list input[type=checkbox]').forEach(cb => {
-    cb.addEventListener('change', () => {
-      state.settings.gcal.selectedCalendars = [...document.querySelectorAll('#gcal-cal-list input[type=checkbox]:checked')]
-        .map(el => el.dataset.calid);
-      save();
-      _gcalCache = {};
-      if (state.activeTab === 'planner') renderPlanner();
-    });
-  });
-
-  // Refresh calendar list button
-  document.getElementById('gcal-refresh-cals')?.addEventListener('click', async () => {
-    const cals = await fetchCalendarList();
-    if (cals.length) {
-      state.settings.gcal.calendarList = cals;
-      state.settings.gcal.selectedCalendars = cals.map(c => c.id);
-      save();
-      renderSettings();
-    }
-  });
+  // Async-populate the calendar list if connected
+  if (gcal.connected) populateGcalList();
 
   // Export
   document.getElementById('export-btn').onclick = exportData;
@@ -2619,6 +2591,61 @@ function gcalDisconnect() {
 
 // ── GCal event reading ──────────────────────────────────
 let _gcalCache = {}; // { "dateStr:calId": [events] }
+
+async function populateGcalList() {
+  const container = document.getElementById('gcal-cal-list');
+  if (!container) return;
+
+  // Wait up to 6s for the API to be ready
+  let waited = 0;
+  while (!gapiInited && waited < 6000) {
+    await new Promise(r => setTimeout(r, 300));
+    waited += 300;
+  }
+
+  if (!gapiInited) {
+    container.innerHTML = `<div style="font-size:12px;color:var(--warn)">API not ready — try disconnecting and reconnecting.</div>`;
+    return;
+  }
+
+  const cals = await fetchCalendarList();
+
+  if (!cals.length) {
+    container.innerHTML = `<div style="font-size:12px;color:var(--warn)">
+      Couldn't load calendars. You may need to disconnect and reconnect to grant calendar access.
+      <button id="gcal-reconnect-btn" class="btn btn-outline" style="margin-top:8px;width:100%;">Reconnect Google Calendar</button>
+    </div>`;
+    document.getElementById('gcal-reconnect-btn')?.addEventListener('click', () => {
+      tokenClient?.requestAccessToken({ prompt: 'consent' });
+    });
+    return;
+  }
+
+  // Save list + default selections
+  state.settings.gcal.calendarList = cals;
+  if (!state.settings.gcal.selectedCalendars) {
+    state.settings.gcal.selectedCalendars = cals.map(c => c.id);
+  }
+  save();
+
+  container.innerHTML = cals.map(cal => `
+    <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px;">
+      <input type="checkbox" data-calid="${cal.id}"
+        ${(state.settings.gcal.selectedCalendars||[]).includes(cal.id) ? 'checked' : ''}>
+      <span style="width:10px;height:10px;border-radius:50%;background:${cal.backgroundColor||'#4285f4'};flex-shrink:0;display:inline-block;"></span>
+      ${esc(cal.summary)}
+    </label>`).join('');
+
+  container.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      state.settings.gcal.selectedCalendars = [...container.querySelectorAll('input[type=checkbox]:checked')]
+        .map(el => el.dataset.calid);
+      save();
+      _gcalCache = {};
+      if (state.activeTab === 'planner') renderPlanner();
+    });
+  });
+}
 
 async function fetchCalendarList() {
   if (!gapiInited) return [];
