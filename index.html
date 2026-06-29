@@ -312,9 +312,11 @@
 
     /* Planner: date nav + two-col layout that fills the panel height */
     #p-planner {
-      display: flex;
       flex-direction: column;
       padding-bottom: 0;
+    }
+    #p-planner.active {
+      display: flex;
     }
     .planner-date-nav {
       flex-shrink: 0;
