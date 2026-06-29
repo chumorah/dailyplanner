@@ -1367,11 +1367,19 @@ function switchTab(tab) {
 
 function renderActive() {
   const t = state.activeTab;
-  if (t === 'today')    renderToday();
-  if (t === 'planner')  renderPlanner();
-  if (t === 'tasks')    renderTasks();
-  if (t === 'all')      renderAll();
-  if (t === 'settings') renderSettings();
+  try {
+    if (t === 'today')    renderToday();
+    if (t === 'planner')  renderPlanner();
+    if (t === 'tasks')    renderTasks();
+    if (t === 'all')      renderAll();
+    if (t === 'settings') renderSettings();
+  } catch(e) {
+    const el = document.getElementById(`${t}-content`);
+    if (el) el.innerHTML = `<div style="color:#f85149;padding:20px;font-size:13px;font-family:monospace;">
+      <strong>Error in ${t}:</strong><br>${e.message}<br><br>${e.stack||''}
+    </div>`;
+    console.error('renderActive error:', e);
+  }
 }
 
 // ─── TODAY ───────────────────────────────────────────
