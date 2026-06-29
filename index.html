@@ -310,16 +310,43 @@
     }
     .planner-date-nav .date-label { font-size: 15px; font-weight: 700; }
 
+    /* Planner: date nav + two-col layout that fills the panel height */
+    #p-planner {
+      display: flex;
+      flex-direction: column;
+      padding-bottom: 0;
+    }
+    .planner-date-nav {
+      flex-shrink: 0;
+    }
     .planner-layout {
-      display: flex; gap: 12px; min-height: 600px;
+      display: flex;
+      gap: 12px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
     }
 
-    /* Unscheduled sidebar */
+    /* Unscheduled sidebar — static, scrolls independently */
     .unscheduled-col {
-      width: 120px; flex-shrink: 0;
+      width: 120px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--tab-h) + 16px);
     }
-    .unscheduled-col .section-title { margin-bottom: 8px; }
+    .unscheduled-col .section-title { margin-bottom: 8px; flex-shrink: 0; }
     .unsched-list { display: flex; flex-direction: column; gap: 6px; }
+
+    /* Time grid — scrollable */
+    .time-grid-col {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: calc(var(--tab-h) + 16px);
+    }
     .unsched-task {
       background: var(--card);
       border: 1px solid var(--border);
@@ -340,7 +367,6 @@
     }
 
     /* Time grid */
-    .time-grid-col { flex: 1; }
     .time-slot {
       display: flex; align-items: stretch; min-height: 44px;
       border-bottom: 1px solid var(--border);
@@ -2067,11 +2093,23 @@ function renderSettings() {
       <h3>🗓 Google Calendar</h3>
       <p>Connect your Google Calendar to sync scheduled tasks. You'll need a free Google Cloud API key.</p>
 
-      ${gcal.connected
-        ? `<div class="gcal-status gcal-connected">✅ Connected to Google Calendar</div>
-           <button class="btn btn-danger" id="gcal-disconnect">Disconnect</button>`
-        : `<div class="gcal-status gcal-disconnected">⚠️ Not connected</div>`
-      }
+      ${gcal.connected ? `
+        <div class="gcal-status gcal-connected">✅ Connected to Google Calendar</div>
+        <div style="margin:12px 0 8px;font-size:12px;font-weight:600;color:var(--tmuted)">SHOW IN PLANNER</div>
+        <div id="gcal-cal-list" style="margin-bottom:12px;">
+          ${(gcal.calendarList||[]).length === 0
+            ? `<div style="font-size:12px;color:var(--tdim)">Loading calendars… <button class="btn btn-outline" id="gcal-refresh-cals" style="padding:2px 8px;font-size:11px;margin-left:6px;">Refresh</button></div>`
+            : (gcal.calendarList||[]).map(cal => `
+              <label style="display:flex;align-items:center;gap:8px;padding:6px 0;cursor:pointer;font-size:13px;">
+                <input type="checkbox" data-calid="${cal.id}"
+                  ${(gcal.selectedCalendars||[cal.id]).includes(cal.id) ? 'checked' : ''}>
+                <span style="width:10px;height:10px;border-radius:50%;background:${cal.backgroundColor||'#4285f4'};flex-shrink:0;"></span>
+                ${esc(cal.summary)}
+              </label>`).join('')
+          }
+        </div>
+        <button class="btn btn-danger" id="gcal-disconnect">Disconnect</button>
+      ` : `<div class="gcal-status gcal-disconnected">⚠️ Not connected</div>`}
 
       <div id="gcal-setup" style="${gcal.connected?'display:none':''}">
         <div class="input-row">
@@ -2138,6 +2176,28 @@ function renderSettings() {
   // Google Calendar
   document.getElementById('gcal-connect')?.addEventListener('click', gcalConnect);
   document.getElementById('gcal-disconnect')?.addEventListener('click', gcalDisconnect);
+
+  // Calendar checkboxes — update selected list and refresh planner
+  document.querySelectorAll('#gcal-cal-list input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      state.settings.gcal.selectedCalendars = [...document.querySelectorAll('#gcal-cal-list input[type=checkbox]:checked')]
+        .map(el => el.dataset.calid);
+      save();
+      _gcalCache = {};
+      if (state.activeTab === 'planner') renderPlanner();
+    });
+  });
+
+  // Refresh calendar list button
+  document.getElementById('gcal-refresh-cals')?.addEventListener('click', async () => {
+    const cals = await fetchCalendarList();
+    if (cals.length) {
+      state.settings.gcal.calendarList = cals;
+      state.settings.gcal.selectedCalendars = cals.map(c => c.id);
+      save();
+      renderSettings();
+    }
+  });
 
   // Export
   document.getElementById('export-btn').onclick = exportData;
@@ -2501,22 +2561,27 @@ function loadGapi() {
     gisLoaded = true;
     tokenClient = google.accounts.oauth2.initTokenClient({
       client_id: state.settings.gcal.clientId,
-      scope: 'https://www.googleapis.com/auth/calendar.events',
-      callback: (resp) => {
+      scope: 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events',
+      callback: async (resp) => {
         if (resp.error) {
           if (resp.error !== 'access_denied') showToast('Calendar auth failed', 'warn');
           return;
         }
         state.settings.gcal.connected = true;
+        // Fetch calendar list so user can pick which ones to show
+        const cals = await fetchCalendarList();
+        if (cals.length) {
+          state.settings.gcal.calendarList = cals;
+          // Default: all calendars selected
+          if (!state.settings.gcal.selectedCalendars) {
+            state.settings.gcal.selectedCalendars = cals.map(c => c.id);
+          }
+        }
         save();
         renderSettings();
-        // Refresh planner with calendar events now that we have a token
-        if (state.activeTab === 'planner') {
-          _gcalCache = {};
-          renderPlanner();
-        } else {
-          showToast('✅ Google Calendar connected!', 'success');
-        }
+        _gcalCache = {};
+        if (state.activeTab === 'planner') renderPlanner();
+        else showToast('✅ Google Calendar connected!', 'success');
       }
     });
     tryAutoConnect();
@@ -2553,37 +2618,59 @@ function gcalDisconnect() {
 }
 
 // ── GCal event reading ──────────────────────────────────
-let _gcalCache = {}; // { dateStr: [events] }
+let _gcalCache = {}; // { "dateStr:calId": [events] }
 
-async function fetchGcalEvents(dateStr) {
+async function fetchCalendarList() {
+  if (!gapiInited) return [];
+  try {
+    const resp = await gapi.client.calendar.calendarList.list({ minAccessRole: 'reader' });
+    return (resp.result.items || []).map(c => ({
+      id: c.id, summary: c.summary, backgroundColor: c.backgroundColor || '#4285f4'
+    }));
+  } catch(e) {
+    console.warn('CalendarList error', e);
+    return [];
+  }
+}
+
+async function fetchGcalEvents(dateStr, calendarId = 'primary') {
   if (!state.settings.gcal.connected || !gapiInited) return [];
-  if (_gcalCache[dateStr]) return _gcalCache[dateStr];
+  const key = `${dateStr}:${calendarId}`;
+  if (_gcalCache[key]) return _gcalCache[key];
   try {
     const start = new Date(dateStr + 'T00:00:00').toISOString();
     const end   = new Date(dateStr + 'T23:59:59').toISOString();
     const resp  = await gapi.client.calendar.events.list({
-      calendarId: 'primary',
-      timeMin: start, timeMax: end,
+      calendarId, timeMin: start, timeMax: end,
       singleEvents: true, orderBy: 'startTime',
     });
-    // Only include timed events (skip all-day)
     const events = (resp.result.items || []).filter(e => e.start?.dateTime);
-    _gcalCache[dateStr] = events;
+    _gcalCache[key] = events;
     return events;
   } catch(e) {
-    console.warn('GCal fetch error', e);
+    console.warn('GCal fetch error', calendarId, e);
     return [];
   }
 }
 
 async function loadGcalForPlanner(dateStr) {
   if (!state.settings.gcal.connected || !gapiInited) return;
-  const events = await fetchGcalEvents(dateStr);
-  if (!events.length) return;
-  // Bail if user navigated away while we were fetching
+
+  // Fetch from all selected calendars (or primary if none selected)
+  const calIds = state.settings.gcal.selectedCalendars?.length
+    ? state.settings.gcal.selectedCalendars
+    : ['primary'];
+  const calColors = Object.fromEntries(
+    (state.settings.gcal.calendarList || []).map(c => [c.id, c.backgroundColor || '#4285f4'])
+  );
+
+  const allEvents = (await Promise.all(calIds.map(id => fetchGcalEvents(dateStr, id))))
+    .flatMap((evts, i) => evts.map(e => ({ ...e, _calColor: calColors[calIds[i]] || '#4285f4' })));
+
+  if (!allEvents.length) return;
   if (state.plannerDate !== dateStr) return;
 
-  events.forEach(event => {
+  allEvents.forEach(event => {
     const startDt = new Date(event.start.dateTime);
     const endDt   = new Date(event.end.dateTime);
     const h = startDt.getHours();
@@ -2598,9 +2685,10 @@ async function loadGcalForPlanner(dateStr) {
     const dropZone = document.querySelector(`.slot-drop[data-slot="${slotKey}"]`);
     if (!dropZone) return;
 
+    const col = event._calColor || '#4285f4';
     const block = document.createElement('div');
     block.className = 'gcal-block';
-    block.style.height = bh + 'px';
+    block.style.cssText = `height:${bh}px;background:${col}22;border-left-color:${col};color:${col};`;
     block.innerHTML = `
       <div class="sb-title">🗓 ${esc(event.summary || 'Event')}</div>
       <div class="sb-time">${fmtTime(slotKey)} – ${fmtTime(endLabel)}</div>`;
