@@ -1113,6 +1113,9 @@ function load() {
       state = Object.assign(state, p);
     }
   } catch(e) { console.warn('Load error', e); }
+  // Reset transient UI state — these should never persist between sessions
+  state.allDone   = false;
+  state.allSearch = '';
 }
 
 function save() {
@@ -1164,6 +1167,8 @@ function startCloudSync() {
         const { _ts, ...rest } = cloud;
         Object.assign(state, rest);
         state._ts = cloud._ts;
+        state.allDone   = false;
+        state.allSearch = '';
         save();
         _syncingFromCloud = false;
         renderActive();
@@ -1185,6 +1190,8 @@ function startCloudSync() {
       const { _ts, ...rest } = cloud;
       Object.assign(state, rest);
       state._ts = cloud._ts;
+      state.allDone   = false;
+      state.allSearch = '';
       save();
       _syncingFromCloud = false;
       renderActive();
