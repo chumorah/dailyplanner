@@ -377,6 +377,19 @@
       font-size: 14px; cursor: pointer; opacity: .6;
       background: none; border: none; color: inherit; line-height: 1;
     }
+    .gcal-block {
+      position: absolute; left: 4px; right: 4px;
+      border-radius: 6px; padding: 4px 8px;
+      font-size: 11px; font-weight: 600;
+      overflow: hidden; cursor: default;
+      min-height: 40px; display: flex; flex-direction: column; justify-content: center;
+      z-index: 1;
+      background: #1a73e822; border-left: 3px solid #4285f4; color: #79c0ff;
+      opacity: 0.85;
+    }
+    .gcal-block .sb-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gcal-block .sb-time  { font-size: 10px; opacity: .75; margin-top: 1px; }
+    .gcal-loading { font-size: 11px; color: var(--tmuted); text-align: center; padding: 4px 0; }
 
     /* ─── TASKS/CATEGORIES TAB ───────────────────── */
     .cat-grid {
@@ -1508,8 +1521,8 @@ function attachTaskRowEvents(containerId) {
       return;
     }
     const id = btn.dataset.id;
-    if (btn.dataset.action === 'check') { toggleComplete(id); renderActive(); }
-    if (btn.dataset.action === 'star')  { toggleTop3(id);     renderActive(); }
+    if (btn.dataset.action === 'check') { try { toggleComplete(id); } catch(e) { console.error(e); } renderActive(); }
+    if (btn.dataset.action === 'star')  { try { toggleTop3(id);     } catch(e) { console.error(e); } renderActive(); }
   });
 
   // Long press → context menu
@@ -1607,16 +1620,21 @@ function renderPlanner() {
     const d2 = new Date(state.plannerDate + 'T00:00:00');
     d2.setDate(d2.getDate() - 1);
     state.plannerDate = d2.toISOString().split('T')[0];
+    delete _gcalCache[state.plannerDate];
     renderPlanner();
   };
   document.getElementById('plan-next').onclick = () => {
     const d2 = new Date(state.plannerDate + 'T00:00:00');
     d2.setDate(d2.getDate() + 1);
     state.plannerDate = d2.toISOString().split('T')[0];
+    delete _gcalCache[state.plannerDate];
     renderPlanner();
   };
 
   attachPlannerDragDrop();
+
+  // Overlay Google Calendar events (async, non-blocking)
+  loadGcalForPlanner(d);
 }
 
 function attachPlannerDragDrop() {
@@ -1813,20 +1831,21 @@ function renderTasks() {
 
 function renderAll() {
   const filterCat  = state.allFilter  || 'all';
-  const filterDone = state.allDone    ?? false; // false = hide completed
   const search     = state.allSearch  || '';
 
   let tasks = [...state.tasks];
-  if (filterCat  !== 'all') tasks = tasks.filter(t => t.category === filterCat);
-  if (!filterDone)           tasks = tasks.filter(t => !t.completed);
-  if (search)                tasks = tasks.filter(t => t.title.toLowerCase().includes(search.toLowerCase()));
+  if (filterCat !== 'all') tasks = tasks.filter(t => t.category === filterCat);
+  if (search)              tasks = tasks.filter(t => t.title.toLowerCase().includes(search.toLowerCase()));
 
-  // Split into current (today/undated/past) and upcoming (future dates)
+  // Separate completed from active
+  const completedTasks = tasks.filter(t => t.completed);
+  tasks = tasks.filter(t => !t.completed);
+
+  // Split active into current (today/undated/past) and upcoming (future dates)
   const futureTasks   = tasks.filter(t => t.date && t.date > TODAY_STR);
   const currentTasks  = tasks.filter(t => !t.date || t.date <= TODAY_STR);
 
-  // Sort: incomplete first, then by creation date
-  currentTasks.sort((a,b) => (a.completed - b.completed) || (b.createdAt - a.createdAt));
+  currentTasks.sort((a,b) => (b.createdAt - a.createdAt));
   futureTasks.sort((a,b) => a.date.localeCompare(b.date));
   tasks = currentTasks; // main list shows current only
 
@@ -1885,12 +1904,9 @@ function renderAll() {
       <div class="filter-pills" id="cat-filter-pills">${catPills}</div>
     </div>
 
-    <!-- Search + toggle -->
+    <!-- Search -->
     <div class="search-row mb">
       <input type="text" id="all-search" placeholder="🔍  Search tasks…" value="${esc(search)}">
-      <button class="toggle-done ${filterDone?'active':''}" id="toggle-done-btn">
-        ${filterDone ? '🙈 Hide done' : '✅ Show done'}
-      </button>
     </div>
 
     <!-- Task list -->
@@ -1911,6 +1927,17 @@ function renderAll() {
       </div>
       <div id="upcoming-list" style="display:none">
         <div class="card">${futureTasks.map(t => taskRowHtml(t, {showStar:true})).join('')}</div>
+      </div>`;
+  }
+
+  // Completed tasks (collapsed by default, with uncheck ability)
+  if (completedTasks.length > 0) {
+    html += `
+      <div class="section-title upcoming-toggle" id="completed-toggle" style="cursor:pointer;margin-top:16px;">
+        ✅ COMPLETED (${completedTasks.length}) <span id="completed-arrow" style="float:right;transition:transform .2s">›</span>
+      </div>
+      <div id="completed-list" style="display:none">
+        <div class="card">${completedTasks.map(t => taskRowHtml(t, {showStar:false})).join('')}</div>
       </div>`;
   }
 
@@ -1981,12 +2008,6 @@ function renderAll() {
     renderAll();
   });
 
-  // Toggle done
-  document.getElementById('toggle-done-btn').onclick = () => {
-    state.allDone = !state.allDone;
-    renderAll();
-  };
-
   // Upcoming toggle
   const upcomingToggle = document.getElementById('upcoming-toggle');
   if (upcomingToggle) {
@@ -1994,7 +2015,19 @@ function renderAll() {
       const list  = document.getElementById('upcoming-list');
       const arrow = document.getElementById('upcoming-arrow');
       const open  = list.style.display !== 'none';
-      list.style.display  = open ? 'none' : 'block';
+      list.style.display    = open ? 'none' : 'block';
+      arrow.style.transform = open ? '' : 'rotate(90deg)';
+    });
+  }
+
+  // Completed toggle
+  const completedToggle = document.getElementById('completed-toggle');
+  if (completedToggle) {
+    completedToggle.addEventListener('click', () => {
+      const list  = document.getElementById('completed-list');
+      const arrow = document.getElementById('completed-arrow');
+      const open  = list.style.display !== 'none';
+      list.style.display    = open ? 'none' : 'block';
       arrow.style.transform = open ? '' : 'rotate(90deg)';
     });
   }
@@ -2499,6 +2532,62 @@ function gcalDisconnect() {
   save();
   renderSettings();
   showToast('Disconnected from Google Calendar', 'warn');
+}
+
+// ── GCal event reading ──────────────────────────────────
+let _gcalCache = {}; // { dateStr: [events] }
+
+async function fetchGcalEvents(dateStr) {
+  if (!state.settings.gcal.connected || !gapiInited) return [];
+  if (_gcalCache[dateStr]) return _gcalCache[dateStr];
+  try {
+    const start = new Date(dateStr + 'T00:00:00').toISOString();
+    const end   = new Date(dateStr + 'T23:59:59').toISOString();
+    const resp  = await gapi.client.calendar.events.list({
+      calendarId: 'primary',
+      timeMin: start, timeMax: end,
+      singleEvents: true, orderBy: 'startTime',
+    });
+    // Only include timed events (skip all-day)
+    const events = (resp.result.items || []).filter(e => e.start?.dateTime);
+    _gcalCache[dateStr] = events;
+    return events;
+  } catch(e) {
+    console.warn('GCal fetch error', e);
+    return [];
+  }
+}
+
+async function loadGcalForPlanner(dateStr) {
+  if (!state.settings.gcal.connected || !gapiInited) return;
+  const events = await fetchGcalEvents(dateStr);
+  if (!events.length) return;
+  // Bail if user navigated away while we were fetching
+  if (state.plannerDate !== dateStr) return;
+
+  events.forEach(event => {
+    const startDt = new Date(event.start.dateTime);
+    const endDt   = new Date(event.end.dateTime);
+    const h = startDt.getHours();
+    const m = startDt.getMinutes() < 30 ? 0 : 30;
+    if (h < SLOT_START || h >= SLOT_END) return; // outside visible range
+    const slotKey = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+    const durationMin = Math.round((endDt - startDt) / 60000);
+    const rows = Math.max(1, Math.ceil(durationMin / 30));
+    const bh   = rows * SLOT_H - 6;
+    const endLabel = `${String(endDt.getHours()).padStart(2,'0')}:${String(endDt.getMinutes()).padStart(2,'0')}`;
+
+    const dropZone = document.querySelector(`.slot-drop[data-slot="${slotKey}"]`);
+    if (!dropZone) return;
+
+    const block = document.createElement('div');
+    block.className = 'gcal-block';
+    block.style.height = bh + 'px';
+    block.innerHTML = `
+      <div class="sb-title">🗓 ${esc(event.summary || 'Event')}</div>
+      <div class="sb-time">${fmtTime(slotKey)} – ${fmtTime(endLabel)}</div>`;
+    dropZone.appendChild(block);
+  });
 }
 
 async function gcalSyncTask(taskId) {
