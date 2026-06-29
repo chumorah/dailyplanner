@@ -1190,6 +1190,9 @@ function initFirebase() {
     _fbAuth = firebase.auth();
     _fbDb   = firebase.firestore();
 
+    // Handle redirect result from mobile Google sign-in
+    _fbAuth.getRedirectResult().catch(e => console.warn('Redirect result error', e));
+
     _fbAuth.onAuthStateChanged(user => {
       _fbUser = user;
       if (user) {
@@ -2691,11 +2694,11 @@ function init() {
   // If Google Calendar was previously connected, reload APIs
   if (state.settings.gcal.connected) loadGapi();
 
-  // Firebase sync
-  initFirebase();
-
-  // Initial render — switchTab restores correct panel visibility + content
+  // Initial render first — don't let Firebase delay the UI
   switchTab(state.activeTab || 'today');
+
+  // Firebase loads after UI is ready
+  setTimeout(initFirebase, 0);
 }
 
 init();
