@@ -1204,7 +1204,13 @@ function initFirebase() {
 
 function fbSignIn() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  _fbAuth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message, 'warn'));
+  // Use redirect on mobile (popup gets blocked), popup on desktop
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    _fbAuth.signInWithRedirect(provider).catch(e => showToast('Sign-in failed: ' + e.message, 'warn'));
+  } else {
+    _fbAuth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message, 'warn'));
+  }
 }
 
 function fbSignOut() {
