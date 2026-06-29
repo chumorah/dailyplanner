@@ -2476,6 +2476,13 @@ function loadGapi() {
   if (!state.settings.gcal.clientId || !state.settings.gcal.apiKey) return;
   if (gapiLoaded) return;
 
+  // Called when both scripts are ready — silently gets a fresh OAuth token
+  function tryAutoConnect() {
+    if (gisLoaded && gapiInited && tokenClient && state.settings.gcal.connected) {
+      tokenClient.requestAccessToken({ prompt: '' });
+    }
+  }
+
   const s1 = document.createElement('script');
   s1.src = 'https://apis.google.com/js/api.js';
   s1.onload = () => {
@@ -2483,6 +2490,7 @@ function loadGapi() {
     gapi.load('client', async () => {
       await gapi.client.init({ apiKey: state.settings.gcal.apiKey, discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest'] });
       gapiInited = true;
+      tryAutoConnect();
     });
   };
   document.head.appendChild(s1);
@@ -2495,13 +2503,23 @@ function loadGapi() {
       client_id: state.settings.gcal.clientId,
       scope: 'https://www.googleapis.com/auth/calendar.events',
       callback: (resp) => {
-        if (resp.error) { showToast('Calendar auth failed', 'warn'); return; }
+        if (resp.error) {
+          if (resp.error !== 'access_denied') showToast('Calendar auth failed', 'warn');
+          return;
+        }
         state.settings.gcal.connected = true;
         save();
-        showToast('✅ Google Calendar connected!', 'success');
         renderSettings();
+        // Refresh planner with calendar events now that we have a token
+        if (state.activeTab === 'planner') {
+          _gcalCache = {};
+          renderPlanner();
+        } else {
+          showToast('✅ Google Calendar connected!', 'success');
+        }
       }
     });
+    tryAutoConnect();
   };
   document.head.appendChild(s2);
 }
