@@ -2709,7 +2709,16 @@ function init() {
   setTimeout(initFirebase, 0);
 }
 
-init();
+try {
+  init();
+} catch(e) {
+  document.body.insertAdjacentHTML('beforeend',
+    `<div style="position:fixed;inset:0;z-index:99999;background:#1e1e1e;color:#f85149;
+      padding:24px;font-family:monospace;font-size:12px;overflow:auto;">
+      <strong>Startup error:</strong><br><br>${e.message}<br><br>${e.stack||''}
+    </div>`
+  );
+}
 </script>
 </body>
 </html>
