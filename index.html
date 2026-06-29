@@ -1208,22 +1208,18 @@ function toggleComplete(id) {
   t.completed = !t.completed;
   save();
 
-  // Spawn next recurrence when marking done
+  // For recurring tasks: instead of spawning a copy, move this task to the next date
   if (t.completed && t.recurrence && t.recurrence !== 'none') {
     const nextDate = nextRecurDate(t.date || TODAY_STR, t.recurrence);
-    const exists = state.tasks.some(x =>
-      x.title === t.title && x.category === t.category && x.date === nextDate && !x.completed
-    );
-    if (!exists) {
-      addTask({
-        title: t.title, category: t.category,
-        date: nextDate, time: t.time,
-        duration: t.duration, notes: t.notes,
-        recurrence: t.recurrence,
-      });
-      showToast(`🔄 Next occurrence created for ${fmtDate(nextDate)}`, 'success');
-      return;
-    }
+    setTimeout(() => {
+      t.completed = false;
+      t.date = nextDate;
+      t.scheduledSlot = t.time || null;
+      save();
+      renderActive();
+      showToast(`🔄 Rescheduled to ${fmtDate(nextDate)}`, 'success');
+    }, 600); // brief pause so the checkoff animation is visible
+    return;
   }
 
   if (t.completed && t.isTop3) {
