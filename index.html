@@ -1199,8 +1199,17 @@ function initFirebase() {
     _fbAuth = firebase.auth();
     _fbDb   = firebase.firestore();
 
-    // Handle redirect result from mobile Google sign-in
-    _fbAuth.getRedirectResult().catch(e => console.warn('Redirect result error', e));
+    // Check if we're returning from a redirect sign-in
+    _fbAuth.getRedirectResult().then(result => {
+      if (result && result.user) {
+        showToast('Signed in as ' + result.user.displayName, 'success');
+      }
+    }).catch(e => {
+      if (e.code !== 'auth/no-auth-event') {
+        showToast('Sign-in error: ' + e.message, 'warn');
+        console.warn('Redirect result error', e);
+      }
+    });
 
     _fbAuth.onAuthStateChanged(user => {
       _fbUser = user;
@@ -1216,13 +1225,17 @@ function initFirebase() {
 
 function fbSignIn() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  // Use redirect on mobile (popup gets blocked), popup on desktop
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  if (isMobile) {
-    _fbAuth.signInWithRedirect(provider).catch(e => showToast('Sign-in failed: ' + e.message, 'warn'));
-  } else {
-    _fbAuth.signInWithPopup(provider).catch(e => showToast('Sign-in failed: ' + e.message, 'warn'));
-  }
+  // Try popup first — works on desktop and most mobile browsers
+  // Fall back to redirect if popup is blocked
+  _fbAuth.signInWithPopup(provider).catch(e => {
+    if (e.code === 'auth/popup-blocked' || e.code === 'auth/popup-closed-by-user') {
+      // Popup was blocked — fall back to redirect flow
+      showToast('Opening Google sign-in...', 'success');
+      _fbAuth.signInWithRedirect(provider).catch(e2 => showToast('Sign-in failed: ' + e2.message, 'warn'));
+    } else {
+      showToast('Sign-in failed: ' + e.message, 'warn');
+    }
+  });
 }
 
 function fbSignOut() {
