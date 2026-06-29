@@ -32,8 +32,8 @@
       --text:      #e8e2da;
       --tmuted:    #7a7570;
       --tdim:      #4e4a46;
-      --r:         14px;
-      --rs:        8px;
+      --r:         4px;
+      --rs:        3px;
       --sh:        0 8px 32px rgba(0,0,0,.6);
       --tab-h:     72px;
       --hdr-h:     64px;
@@ -89,10 +89,18 @@
       min-height: 0;
     }
 
+    .content-row {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+      min-height: 0;
+    }
+
     .panels {
       flex: 1;
       overflow: hidden;
       position: relative;
+      min-width: 0;
     }
     .panel {
       position: absolute; inset: 0;
@@ -102,6 +110,10 @@
       display: none;
     }
     .panel.active { display: block; }
+
+    .right-panel {
+      display: none;
+    }
 
     .tab-bar {
       position: fixed;
@@ -165,10 +177,10 @@
     }
     .progress-bar-wrap {
       flex: 1; height: 3px;
-      background: var(--card2); border-radius: 99px; overflow: hidden;
+      background: var(--card2); border-radius: 2px; overflow: hidden;
     }
     .progress-bar {
-      height: 100%; border-radius: 99px;
+      height: 100%; border-radius: 2px;
       background: var(--primary);
       transition: width .4s ease;
     }
@@ -246,7 +258,7 @@
     .task-chips { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .chip {
       font-size: 10px; font-weight: 600; padding: 2px 7px;
-      border-radius: 99px; white-space: nowrap;
+      border-radius: 3px; white-space: nowrap;
     }
     .chip-mit   { background: rgba(217,123,80,.15); color: var(--plight); }
     .chip-time  { background: rgba(245,158,11,.12); color: var(--accent); }
@@ -275,7 +287,7 @@
       display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px;
     }
     .recur-opt {
-      padding: 6px 12px; border-radius: 99px;
+      padding: 6px 12px; border-radius: 3px;
       border: 0.5px solid var(--border);
       background: none; color: var(--tmuted);
       font-size: 12px; font-weight: 600; cursor: pointer;
@@ -378,7 +390,7 @@
     }
     .slot-drop {
       flex: 1; min-height: 44px; position: relative;
-      border-radius: 0 4px 4px 0;
+      border-radius: 0 2px 2px 0;
       transition: background .15s;
     }
     .slot-drop.drag-over {
@@ -387,7 +399,7 @@
     }
     .sched-block {
       position: absolute; left: 4px; right: 4px;
-      border-radius: 6px; padding: 4px 8px;
+      border-radius: 3px; padding: 4px 8px;
       font-size: 11px; font-weight: 600;
       overflow: hidden; cursor: pointer;
       min-height: 40px; display: flex; flex-direction: column; justify-content: center;
@@ -402,7 +414,7 @@
     }
     .gcal-block {
       position: absolute; left: 4px; right: 4px;
-      border-radius: 6px; padding: 4px 8px;
+      border-radius: 3px; padding: 4px 8px;
       font-size: 11px; font-weight: 600;
       overflow: hidden; cursor: default;
       min-height: 40px; display: flex; flex-direction: column; justify-content: center;
@@ -507,7 +519,7 @@
     .modal {
       width: 100%; max-width: 480px;
       background: var(--surface);
-      border-radius: 20px 20px 0 0;
+      border-radius: 6px 6px 0 0;
       border-top: 0.5px solid var(--border);
       padding: 20px 20px calc(24px + env(safe-area-inset-bottom));
       animation: slide-up .25s ease;
@@ -515,7 +527,7 @@
     }
     @keyframes slide-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
     .modal-handle {
-      width: 36px; height: 3px; border-radius: 99px;
+      width: 36px; height: 3px; border-radius: 2px;
       background: var(--border); margin: 0 auto 18px; display: block;
     }
     .modal-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
@@ -552,7 +564,7 @@
     }
     .cat-pick-item {
       display: flex; align-items: center; gap: 6px;
-      padding: 7px 12px; border-radius: 99px;
+      padding: 7px 12px; border-radius: 3px;
       border: 0.5px solid var(--border);
       font-size: 12px; font-weight: 600; cursor: pointer;
       transition: all .15s;
@@ -681,7 +693,7 @@
     .filter-row { overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 4px; }
     .filter-pills { display: flex; gap: 8px; white-space: nowrap; }
     .filter-pill {
-      padding: 6px 14px; border-radius: 99px;
+      padding: 6px 14px; border-radius: 3px;
       border: 0.5px solid var(--border);
       background: none; color: var(--tmuted);
       font-size: 12px; font-weight: 600; cursor: pointer;
@@ -713,7 +725,7 @@
 
     ::-webkit-scrollbar { width: 3px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
 
     .empty {
       text-align: center; padding: 32px 20px;
@@ -738,7 +750,7 @@
 
     .badge {
       font-size: 10px; font-weight: 700;
-      padding: 2px 6px; border-radius: 99px;
+      padding: 2px 6px; border-radius: 3px;
       background: var(--primary); color: #fff;
       position: absolute; top: -4px; right: -4px;
       min-width: 16px; text-align: center;
@@ -822,27 +834,71 @@
         min-width: 0;
       }
 
+      .content-row {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+        min-height: 0;
+      }
+
       .hdr { border-bottom: 0.5px solid var(--border); }
       .hdr-left .logo { display: none; }
       .hdr-left .sub  { font-size: 14px; font-weight: 600; color: var(--text); }
 
-      .panels { flex: 1; overflow: hidden; }
-      .panel { padding: 28px 40px 28px; }
+      .panels { flex: 1; overflow: hidden; min-width: 0; }
+      .panel { padding: 28px 36px 28px; }
 
-      #fab { position: fixed; bottom: 28px; right: 28px; left: auto; transform: none; }
+      .right-panel {
+        display: block;
+        width: 240px;
+        flex-shrink: 0;
+        border-left: 0.5px solid var(--border);
+        overflow-y: auto;
+        padding: 28px 20px;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      #fab { position: fixed; bottom: 28px; right: 268px; transform: none; }
 
       .planner-layout { gap: 20px; }
       .unscheduled-col { width: 180px; }
       .cat-grid { grid-template-columns: repeat(3, 1fr); }
-      .mit-section { max-width: 680px; }
+      .mit-section { max-width: 100%; }
 
-      #toast { bottom: 90px !important; right: 28px !important; left: auto !important; transform: none !important; }
+      #toast { bottom: 90px !important; right: 268px !important; left: auto !important; transform: none !important; }
     }
 
     @media (min-width: 1200px) {
       :root { --sidebar-w: 220px; }
       .cat-grid { grid-template-columns: repeat(4, 1fr); }
     }
+
+    /* ─── RIGHT PANEL COMPONENTS ────────────────── */
+    .rp-section { margin-bottom: 28px; }
+    .rp-section-title {
+      font-size: 10px; font-weight: 600; letter-spacing: .8px;
+      text-transform: uppercase; color: var(--tdim);
+      margin-bottom: 12px; display: flex; align-items: center;
+      justify-content: space-between;
+    }
+    .rp-section-count { font-weight: 400; color: var(--tdim); }
+    .rp-cat-row {
+      display: flex; align-items: center; gap: 9px;
+      padding: 7px 0; border-bottom: 0.5px solid var(--border);
+      font-size: 12px;
+    }
+    .rp-cat-row:last-child { border-bottom: none; }
+    .rp-cat-name { flex: 1; color: var(--text); }
+    .rp-cat-counts { font-size: 11px; color: var(--tmuted); display: flex; gap: 6px; align-items: center; }
+    .rp-overdue-n  { color: var(--danger); font-weight: 600; font-size: 10px; }
+    .rp-task-row {
+      padding: 7px 0; border-bottom: 0.5px solid var(--border);
+      font-size: 12px;
+    }
+    .rp-task-row:last-child { border-bottom: none; }
+    .rp-task-title { color: var(--text); margin-bottom: 2px; }
+    .rp-task-meta  { font-size: 10px; color: var(--tmuted); }
+    .rp-empty { font-size: 11px; color: var(--tdim); line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -882,6 +938,9 @@
     </div>
   </header>
 
+  <!-- CONTENT ROW (panels + right panel) -->
+  <div class="content-row">
+
   <!-- PANELS -->
   <div class="panels">
 
@@ -911,6 +970,11 @@
     </div>
 
   </div>
+
+  <!-- RIGHT PANEL -->
+  <aside id="right-panel" class="right-panel"></aside>
+
+  </div><!-- /.content-row -->
 
   </div><!-- /.main-wrap -->
 
@@ -1396,6 +1460,7 @@ function renderActive() {
     if (t === 'tasks')    renderTasks();
     if (t === 'all')      renderAll();
     if (t === 'settings') renderSettings();
+    renderRightPanel();
   } catch(e) {
     const el = document.getElementById(`${t}-content`);
     if (el) el.innerHTML = `<div style="color:#f85149;padding:20px;font-size:13px;font-family:monospace;">
@@ -1424,8 +1489,8 @@ function renderToday() {
 
     <div class="mit-section">
       <div class="mit-header">
-        <span class="mit-label">🎯 TOP 3 MUST-DOS</span>
-        <span class="mit-count">${mit.length}/3 pinned</span>
+        <span class="mit-label">Top 3 for today</span>
+        <span class="mit-count">${mit.length}/3</span>
       </div>
       ${mit.length === 0
         ? `<div class="mit-placeholder">Tap ⭐ on any task below to pin it here as a must-do</div>`
@@ -1438,7 +1503,7 @@ function renderToday() {
       }
     </div>
 
-    <div class="section-title">ALL TODAY'S TASKS (${tasks.length})</div>
+    <div class="section-title">All open · ${tasks.filter(t=>!t.completed).length}</div>
   `;
 
   if (tasks.length === 0) {
@@ -1453,6 +1518,66 @@ function renderToday() {
 
   document.getElementById('today-content').innerHTML = html;
   attachTaskRowEvents('today-content');
+}
+
+function renderRightPanel() {
+  const el = document.getElementById('right-panel');
+  if (!el || el.offsetParent === null) return; // hidden on mobile
+
+  const cats = state.categories;
+  const tasks = state.tasks;
+
+  // Overdue tasks (date < today, not completed)
+  const overdue = tasks.filter(t => !t.completed && t.date && t.date < TODAY_STR);
+
+  // Category rows with open/total counts
+  const catRows = cats.map(c => {
+    const all  = tasks.filter(t => t.category === c.id);
+    const open = all.filter(t => !t.completed);
+    const od   = all.filter(t => !t.completed && t.date && t.date < TODAY_STR);
+    return { ...c, open: open.length, total: all.length, overdue: od.length };
+  }).filter(c => c.total > 0);
+
+  let html = `<div class="rp-section">
+    <div class="rp-section-title">Categories <span class="rp-section-count">${catRows.length}</span></div>`;
+
+  if (catRows.length === 0) {
+    html += `<div class="rp-empty">No categories yet. Add one in the Categories tab.</div>`;
+  } else {
+    catRows.forEach(c => {
+      html += `<div class="rp-cat-row">
+        <span style="font-size:15px">${c.emoji}</span>
+        <span class="rp-cat-name">${esc(c.name)}</span>
+        <span class="rp-cat-counts">
+          ${c.overdue > 0 ? `<span class="rp-overdue-n">${c.overdue} late</span>` : ''}
+          <span>${c.open} open</span>
+        </span>
+      </div>`;
+    });
+  }
+  html += `</div>`;
+
+  // Overdue section
+  html += `<div class="rp-section">
+    <div class="rp-section-title">Overdue <span class="rp-section-count">${overdue.length}</span></div>`;
+
+  if (overdue.length === 0) {
+    html += `<div class="rp-empty">Nothing overdue. You're on top of it.</div>`;
+  } else {
+    overdue.slice(0, 8).forEach(t => {
+      const cat = catById(t.category);
+      html += `<div class="rp-task-row">
+        <div class="rp-task-title">${esc(t.title)}</div>
+        <div class="rp-task-meta">${cat.emoji} ${esc(cat.name)} · ${fmtDate(t.date)}</div>
+      </div>`;
+    });
+    if (overdue.length > 8) {
+      html += `<div class="rp-empty" style="margin-top:6px">+${overdue.length - 8} more</div>`;
+    }
+  }
+  html += `</div>`;
+
+  el.innerHTML = html;
 }
 
 function taskRowHtml(t, opts={}) {
