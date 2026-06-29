@@ -1669,8 +1669,14 @@ function renderAll() {
   if (!filterDone)           tasks = tasks.filter(t => !t.completed);
   if (search)                tasks = tasks.filter(t => t.title.toLowerCase().includes(search.toLowerCase()));
 
+  // Split into current (today/undated/past) and upcoming (future dates)
+  const futureTasks   = tasks.filter(t => t.date && t.date > TODAY_STR);
+  const currentTasks  = tasks.filter(t => !t.date || t.date <= TODAY_STR);
+
   // Sort: incomplete first, then by creation date
-  tasks.sort((a,b) => (a.completed - b.completed) || (b.createdAt - a.createdAt));
+  currentTasks.sort((a,b) => (a.completed - b.completed) || (b.createdAt - a.createdAt));
+  futureTasks.sort((a,b) => a.date.localeCompare(b.date));
+  tasks = currentTasks; // main list shows current only
 
   const total    = state.tasks.length;
   const open     = state.tasks.filter(t => !t.completed).length;
@@ -1745,6 +1751,17 @@ function renderAll() {
     html += `<div class="card">${tasks.map(t => taskRowHtml(t, {showStar:true})).join('')}</div>`;
   }
 
+  // Upcoming future tasks (collapsed by default)
+  if (futureTasks.length > 0) {
+    html += `
+      <div class="section-title upcoming-toggle" id="upcoming-toggle" style="cursor:pointer;margin-top:16px;">
+        📅 UPCOMING (${futureTasks.length}) <span id="upcoming-arrow" style="float:right;transition:transform .2s">›</span>
+      </div>
+      <div id="upcoming-list" style="display:none">
+        <div class="card">${futureTasks.map(t => taskRowHtml(t, {showStar:true})).join('')}</div>
+      </div>`;
+  }
+
   document.getElementById('all-content').innerHTML = html;
 
   // Quick-add
@@ -1817,6 +1834,18 @@ function renderAll() {
     state.allDone = !state.allDone;
     renderAll();
   };
+
+  // Upcoming toggle
+  const upcomingToggle = document.getElementById('upcoming-toggle');
+  if (upcomingToggle) {
+    upcomingToggle.addEventListener('click', () => {
+      const list  = document.getElementById('upcoming-list');
+      const arrow = document.getElementById('upcoming-arrow');
+      const open  = list.style.display !== 'none';
+      list.style.display  = open ? 'none' : 'block';
+      arrow.style.transform = open ? '' : 'rotate(90deg)';
+    });
+  }
 
   attachTaskRowEvents('all-content');
 }
