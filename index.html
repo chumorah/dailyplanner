@@ -1610,28 +1610,45 @@ function attachTaskRowEvents(containerId) {
   const c = document.getElementById(containerId);
   if (!c) return;
 
-  c.addEventListener('click', e => {
+  // Use onclick/onpointerdown (not addEventListener) so re-renders never stack duplicate handlers
+  c.onclick = e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) {
-      // tapped row → edit task
       const row = e.target.closest('.task-row');
       if (row) openEditTask(row.dataset.id);
       return;
     }
     const id = btn.dataset.id;
-    if (btn.dataset.action === 'check') { try { toggleComplete(id); } catch(e) { console.error(e); } renderActive(); }
-    if (btn.dataset.action === 'star')  { try { toggleTop3(id);     } catch(e) { console.error(e); } renderActive(); }
-  });
+    if (btn.dataset.action === 'check') {
+      // Optimistically update the DOM so the checkmark is visible immediately
+      const checkEl = c.querySelector(`.check[data-id="${id}"]`);
+      const rowEl   = checkEl?.closest('.task-row');
+      const wasDone = checkEl?.classList.contains('done');
+      if (checkEl) {
+        checkEl.classList.toggle('done', !wasDone);
+        if (rowEl) {
+          rowEl.classList.toggle('done', !wasDone);
+          const titleEl = rowEl.querySelector('.task-title');
+          if (titleEl) titleEl.style.textDecoration = wasDone ? '' : 'line-through';
+        }
+      }
+      try { toggleComplete(id); } catch(err) { console.error(err); }
+      // Short delay so user sees the check before the list re-renders
+      setTimeout(() => renderActive(), 450);
+      return;
+    }
+    if (btn.dataset.action === 'star') { try { toggleTop3(id); } catch(err) { console.error(err); } renderActive(); }
+  };
 
   // Long press → context menu
   let pressTimer;
-  c.addEventListener('pointerdown', e => {
+  c.onpointerdown = e => {
     const row = e.target.closest('.task-row');
     if (!row) return;
     pressTimer = setTimeout(() => showCtxMenu(e, row.dataset.id), 500);
-  });
-  c.addEventListener('pointerup',   () => clearTimeout(pressTimer));
-  c.addEventListener('pointermove', () => clearTimeout(pressTimer));
+  };
+  c.onpointerup   = () => clearTimeout(pressTimer);
+  c.onpointermove = () => clearTimeout(pressTimer);
 }
 
 // ─── PLANNER ──────────────────────────────────────────
@@ -1697,11 +1714,17 @@ function renderPlanner() {
 
   if (!unschedHtml) unschedHtml = `<div style="font-size:11px;color:var(--tdim);text-align:center;padding:12px 0">All scheduled!</div>`;
 
+  const gcal = state.settings.gcal;
+  const gcalReconnectBtn = (gcal.connected && gapiInited && !gapi.client.getToken())
+    ? `<button id="gcal-reconnect-btn" style="font-size:11px;padding:4px 10px;background:none;border:0.5px solid var(--border);border-radius:3px;color:var(--tmuted);cursor:pointer;margin-left:auto;">↻ Reconnect Calendar</button>`
+    : '';
+
   document.getElementById('planner-content').innerHTML = `
     <div class="planner-date-nav">
       <button id="plan-prev">‹</button>
       <div class="date-label">${dLabel}</div>
       <button id="plan-next">›</button>
+      ${gcalReconnectBtn}
     </div>
     <div class="planner-layout">
       <div class="unscheduled-col">
@@ -1728,6 +1751,13 @@ function renderPlanner() {
     delete _gcalCache[state.plannerDate];
     renderPlanner();
   };
+
+  const reconnectBtn = document.getElementById('gcal-reconnect-btn');
+  if (reconnectBtn) {
+    reconnectBtn.onclick = () => {
+      tokenClient.requestAccessToken({ prompt: '' });
+    };
+  }
 
   attachPlannerDragDrop();
 
@@ -2580,12 +2610,8 @@ function loadGapi() {
   if (!state.settings.gcal.clientId || !state.settings.gcal.apiKey) return;
   if (gapiLoaded) return;
 
-  // Called when both scripts are ready — silently gets a fresh OAuth token
-  function tryAutoConnect() {
-    if (gisLoaded && gapiInited && tokenClient && state.settings.gcal.connected) {
-      tokenClient.requestAccessToken({ prompt: '' });
-    }
-  }
+  // No auto-connect on load — only connect when user explicitly requests it
+  function tryAutoConnect() { /* intentionally disabled to avoid popup on every refresh */ }
 
   const s1 = document.createElement('script');
   s1.src = 'https://apis.google.com/js/api.js';
@@ -2787,10 +2813,19 @@ async function loadGcalForPlanner(dateStr) {
     const col = event._calColor || '#4285f4';
     const block = document.createElement('div');
     block.className = 'gcal-block';
-    block.style.cssText = `height:${bh}px;background:${col}22;border-left-color:${col};color:${col};`;
     block.innerHTML = `
-      <div class="sb-title">🗓 ${esc(event.summary || 'Event')}</div>
+      <div class="sb-title">${esc(event.summary || 'Event')}</div>
       <div class="sb-time">${fmtTime(slotKey)} – ${fmtTime(endLabel)}</div>`;
+
+    // If a task block already exists in this slot, split them side by side
+    const existingTask = dropZone.querySelector('.sched-block');
+    if (existingTask) {
+      existingTask.style.right = 'calc(50% + 2px)';
+      block.style.cssText = `height:${bh}px;left:calc(50% + 2px);right:4px;background:${col}22;border-left-color:${col};color:${col};`;
+    } else {
+      block.style.cssText = `height:${bh}px;background:${col}22;border-left-color:${col};color:${col};`;
+    }
+
     dropZone.appendChild(block);
   });
 }
