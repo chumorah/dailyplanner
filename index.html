@@ -1115,7 +1115,8 @@
 //  STATE & PERSISTENCE
 // ═══════════════════════════════════════════════════════
 
-const TODAY_STR = new Date().toISOString().split('T')[0];
+const _now = new Date();
+const TODAY_STR = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}-${String(_now.getDate()).padStart(2,'0')}`;
 
 const DEFAULT_CATEGORIES = [
   { id: 'inbox',    name: 'Inbox',    color: '#6b7280', emoji: '📥' },
@@ -1620,21 +1621,14 @@ function attachTaskRowEvents(containerId) {
     }
     const id = btn.dataset.id;
     if (btn.dataset.action === 'check') {
-      // Optimistically update the DOM so the checkmark is visible immediately
-      const checkEl = c.querySelector(`.check[data-id="${id}"]`);
-      const rowEl   = checkEl?.closest('.task-row');
-      const wasDone = checkEl?.classList.contains('done');
-      if (checkEl) {
-        checkEl.classList.toggle('done', !wasDone);
-        if (rowEl) {
-          rowEl.classList.toggle('done', !wasDone);
-          const titleEl = rowEl.querySelector('.task-title');
-          if (titleEl) titleEl.style.textDecoration = wasDone ? '' : 'line-through';
-        }
-      }
+      // Update the exact element clicked (not querySelector which can find the wrong one)
+      const rowEl  = btn.closest('.task-row');
+      const wasDone = btn.classList.contains('done');
+      btn.classList.toggle('done', !wasDone);
+      if (rowEl) rowEl.classList.toggle('done', !wasDone);
       try { toggleComplete(id); } catch(err) { console.error(err); }
       // Short delay so user sees the check before the list re-renders
-      setTimeout(() => renderActive(), 450);
+      setTimeout(() => renderActive(), 350);
       return;
     }
     if (btn.dataset.action === 'star') { try { toggleTop3(id); } catch(err) { console.error(err); } renderActive(); }
@@ -2058,13 +2052,15 @@ function renderAll() {
       </div>`;
   }
 
-  // Completed tasks (collapsed by default, with uncheck ability)
+  // Completed tasks (visible by default so checking a task doesn't look like it disappeared)
   if (completedTasks.length > 0) {
+    const listDisplay = state.allCompletedOpen !== false ? 'block' : 'none';
+    const arrowRot    = state.allCompletedOpen !== false ? 'rotate(90deg)' : '';
     html += `
       <div class="section-title upcoming-toggle" id="completed-toggle" style="cursor:pointer;margin-top:16px;">
-        ✅ COMPLETED (${completedTasks.length}) <span id="completed-arrow" style="float:right;transition:transform .2s">›</span>
+        COMPLETED (${completedTasks.length}) <span id="completed-arrow" style="float:right;transition:transform .2s;transform:${arrowRot}">›</span>
       </div>
-      <div id="completed-list" style="display:none">
+      <div id="completed-list" style="display:${listDisplay}">
         <div class="card">${completedTasks.map(t => taskRowHtml(t, {showStar:false})).join('')}</div>
       </div>`;
   }
@@ -2151,13 +2147,14 @@ function renderAll() {
   // Completed toggle
   const completedToggle = document.getElementById('completed-toggle');
   if (completedToggle) {
-    completedToggle.addEventListener('click', () => {
+    completedToggle.onclick = () => {
       const list  = document.getElementById('completed-list');
       const arrow = document.getElementById('completed-arrow');
       const open  = list.style.display !== 'none';
       list.style.display    = open ? 'none' : 'block';
       arrow.style.transform = open ? '' : 'rotate(90deg)';
-    });
+      state.allCompletedOpen = !open;
+    };
   }
 
   attachTaskRowEvents('all-content');
