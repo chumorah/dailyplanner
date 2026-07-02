@@ -263,6 +263,7 @@
     .chip-mit   { background: rgba(217,123,80,.15); color: var(--plight); }
     .chip-time  { background: rgba(245,158,11,.12); color: var(--accent); }
     .chip-recur { background: rgba(63,185,80,.12); color: var(--success); }
+    .chip-date  { background: rgba(120,120,200,.12); color: #9898d8; }
 
     .schedule-toggle {
       width: 100%; padding: 11px 14px;
@@ -1322,6 +1323,19 @@ function fmtDate(ds) {
   return d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
 }
 
+function fmtDateShort(ds) {
+  if (!ds) return '';
+  const _tom = new Date(_now); _tom.setDate(_tom.getDate() + 1);
+  const _yes = new Date(_now); _yes.setDate(_yes.getDate() - 1);
+  const tomStr = `${_tom.getFullYear()}-${String(_tom.getMonth()+1).padStart(2,'0')}-${String(_tom.getDate()).padStart(2,'0')}`;
+  const yesStr = `${_yes.getFullYear()}-${String(_yes.getMonth()+1).padStart(2,'0')}-${String(_yes.getDate()).padStart(2,'0')}`;
+  if (ds === TODAY_STR) return 'Today';
+  if (ds === tomStr)    return 'Tomorrow';
+  if (ds === yesStr)    return 'Yesterday';
+  const d = new Date(ds + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+}
+
 function fmtTime(t) {
   if (!t) return '';
   const [h, m] = t.split(':').map(Number);
@@ -1586,6 +1600,7 @@ function taskRowHtml(t, opts={}) {
   const mitChip   = t.isTop3 ? `<span class="chip chip-mit">🎯 MIT</span>` : '';
   const timeChip  = t.time ? `<span class="chip chip-time">${fmtTime(t.time)}</span>` : '';
   const recurChip = (t.recurrence && t.recurrence !== 'none') ? `<span class="chip chip-recur">${RECUR_LABELS[t.recurrence]}</span>` : '';
+  const dateChip  = (opts.showDate && t.date) ? `<span class="chip chip-date">${fmtDateShort(t.date)}</span>` : '';
   const starActive = t.isTop3 ? 'active' : '';
   const rowClass = t.completed ? 'done' : '';
 
@@ -1601,7 +1616,7 @@ function taskRowHtml(t, opts={}) {
         </div>
       </div>
       <div class="task-chips">
-        ${recurChip}${mitChip}${timeChip}
+        ${recurChip}${mitChip}${dateChip}${timeChip}
       </div>
       ${opts.showStar !== false ? `<button class="star-btn ${starActive}" data-action="star" data-id="${t.id}" title="Pin as must-do">⭐</button>` : ''}
     </div>`;
@@ -2038,7 +2053,7 @@ function renderAll() {
   if (tasks.length === 0) {
     html += `<div class="empty"><div class="e-icon">🎉</div><div class="e-msg">${search ? 'No matches' : open===0 ? 'All done!' : 'Nothing here'}</div>${search?'Try a different search':open===0?'You crushed it today!':'Add a task above'}</div>`;
   } else {
-    html += `<div class="card">${tasks.map(t => taskRowHtml(t, {showStar:true})).join('')}</div>`;
+    html += `<div class="card">${tasks.map(t => taskRowHtml(t, {showStar:true, showDate:true})).join('')}</div>`;
   }
 
   // Upcoming future tasks (collapsed by default)
@@ -2048,7 +2063,7 @@ function renderAll() {
         📅 UPCOMING (${futureTasks.length}) <span id="upcoming-arrow" style="float:right;transition:transform .2s">›</span>
       </div>
       <div id="upcoming-list" style="display:none">
-        <div class="card">${futureTasks.map(t => taskRowHtml(t, {showStar:true})).join('')}</div>
+        <div class="card">${futureTasks.map(t => taskRowHtml(t, {showStar:true, showDate:true})).join('')}</div>
       </div>`;
   }
 
@@ -2061,7 +2076,7 @@ function renderAll() {
         COMPLETED (${completedTasks.length}) <span id="completed-arrow" style="float:right;transition:transform .2s;transform:${arrowRot}">›</span>
       </div>
       <div id="completed-list" style="display:${listDisplay}">
-        <div class="card">${completedTasks.map(t => taskRowHtml(t, {showStar:false})).join('')}</div>
+        <div class="card">${completedTasks.map(t => taskRowHtml(t, {showStar:false, showDate:true})).join('')}</div>
       </div>`;
   }
 
